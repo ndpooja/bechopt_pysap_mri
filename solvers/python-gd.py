@@ -6,10 +6,11 @@ from benchopt import safe_import_context
 
 
 with safe_import_context() as import_ctx:
-    from mri.operators import WaveletN, GradSynthesis
+    from mri.operators import GradSynthesis
     from modopt.opt.algorithms import ForwardBackward
     from modopt.opt.proximity import SparseThreshold
     from modopt.opt.linear import Identity
+    
 
 
 
@@ -22,34 +23,32 @@ class Solver(BaseSolver):
     # any parameter defined here is accessible as a class attribute
     
 
-    def set_objective(self, image, mask, fourier_op, kspace_obs):
+    def set_objective(self, fourier_op, kspace_obs, linear_op, mu):
         # The arguments of this function are the results of the
         # `to_dict` method of the objective.
         # They are customizable.
-        self.image, self.mask = image, mask
         self.fourier_op, self.kspace_obs = fourier_op, kspace_obs
-        mu = 1e-4
-        self.linear_op = WaveletN(wavelet_name='sym8',
-                         nb_scale=3,
-                         dim=2,
-                         padding='periodization')
-        self.regularizer_op = SparseThreshold(Identity(), mu, thresh_type="soft")
-        
-
-    def run(self, callback):
-
-        self.grad_class = GradSynthesis
-        self.gradient_op = self.grad_class(
+        self.linear_op = linear_op
+        self.mu = mu
+        grad_class = GradSynthesis
+        self.gradient_op = grad_class(
             fourier_op=self.fourier_op,
             linear_op= self.linear_op,
         )
         self.gradient_op.obs_data = self.kspace_obs
+        print(self.gradient_op.fourier_op.shape)
         x_init = np.squeeze(np.zeros((1,*self.gradient_op.fourier_op.shape),
                                      dtype=np.complex))
-        alpha_init = self.linear_op.op(x_init)
+        self.alpha_init = self.linear_op.op(x_init)
+        self.regularizer_op = SparseThreshold(Identity(), self.mu, thresh_type="soft")
+
+        
+        
+
+    def run(self, callback):
 
         self.opt = ForwardBackward(
-        x=alpha_init,
+        x=self.alpha_init,
         grad=self.gradient_op,
         prox=self.regularizer_op,
         metric_call_period=None,
@@ -69,4 +68,4 @@ class Solver(BaseSolver):
         # The outputs of this function are the arguments of the
         # `compute` method of the objective.
         # They are customizable.
-        return self.opt.x_final.copy()
+        return self.opt.x_final
