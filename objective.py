@@ -28,8 +28,6 @@ class Objective(BaseObjective):
                          padding='periodization')
         
 
-
-
     def compute(self, x_final):
         # The arguments of this function are the outputs of the
         # `get_result` method of the solver.
@@ -37,11 +35,12 @@ class Objective(BaseObjective):
         sparsity = self.mu * np.sum(np.abs(x_final))
         data_fidelity = 0.5 * np.linalg.norm(self.fourier_op.op(x_final) - self.kspace_obs)**2
         cost = sparsity + data_fidelity
-        
-        return dict(value=cost)
+        nrmse = np.linalg.norm(x_final - self.image) / np.mean(self.image)  
+
+        return dict(value=cost, nrmse=nrmse)
 
     def to_dict(self):
         # The output of this function are the keyword arguments
         # for the `set_objective` method of the solver.
         # They are customizable.
-        return dict(fourier_op=self.fourier_op, kspace_obs=self.kspace_obs, linear_op=self.linear_op, mu = self.mu)
+        return dict(image=self.image, fourier_op=self.fourier_op, kspace_obs=self.kspace_obs, linear_op=self.linear_op, mu=self.mu)
