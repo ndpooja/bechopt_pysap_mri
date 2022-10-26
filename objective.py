@@ -5,12 +5,10 @@ from benchopt import BaseObjective, safe_import_context
 with safe_import_context() as import_ctx:
     import numpy as np
     from mri.operators import NonCartesianFFT, WaveletN
-    
+
 
 class Objective(BaseObjective):
     name = "FISTA"
-
-    # All parameters 'p' defined here are available as 'self.p'
 
 
     def set_data(self, image, mask):
@@ -21,12 +19,12 @@ class Objective(BaseObjective):
         self.kspace_loc = self.mask.data
         self.fourier_op = NonCartesianFFT(samples=self.kspace_loc, shape=image.shape, implementation='gpuNUFFT')
         self.kspace_obs = self.fourier_op.op(image.data)
-        self.mu = 1e-4
+        self.mu = 1e-7
         self.linear_op = WaveletN(wavelet_name='sym8',
                          nb_scale=3,
                          dim=2,
                          padding='periodization')
-        
+
 
     def compute(self, x_final):
         # The arguments of this function are the outputs of the
@@ -35,9 +33,9 @@ class Objective(BaseObjective):
         sparsity = self.mu * np.sum(np.abs(x_final))
         data_fidelity = 0.5 * np.linalg.norm(self.fourier_op.op(x_final) - self.kspace_obs)**2
         cost = sparsity + data_fidelity
-        nrmse = np.linalg.norm(x_final - self.image) / np.mean(self.image)  
+        nrmse = np.linalg.norm(self.image- x_final) / np.mean(self.image)  
 
-        return dict(value=cost, nrmse=nrmse)
+        return dict(value=cost, value_cost=cost, value_nrmse = nrmse)
 
     def to_dict(self):
         # The output of this function are the keyword arguments
